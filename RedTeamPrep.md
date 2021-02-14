@@ -311,7 +311,17 @@
 >
 > > :information_desk_person: Service Account must be trusted for delegation to be able to make requests as a user. 
 > >
-> > ***Unconstrained Delegation***
+> > :information_desk_person: A mechanism is required to impersonate the incoming user and authenticate to the second hop server. 
+> >
+> > ***Unconstrained Delegation*** -- Double hopes Kerberos 
+> >
+> > > :information_desk_person: Allow Access to any service on any computer in the domain 
+> >
+> > ***Constrained Delegation*** 
+> >
+> > > :information_desk_person: Request only to specified services on specified computers;
+> > >
+> > > :information_source: If the user is not using Kerberos Authentication to authenticate to the first hope server, Window offer protocol transition to transition the request to Kerberos
 > >
 > > 
 
