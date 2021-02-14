@@ -133,7 +133,7 @@
 
 ***Privs Escalation***
 
-> :one: ***Kerberoast***
+> :one: ***Kerberoast*** : Offline cracking TGS Hashes 
 >
 > > :information_desk_person: Offline password decryption : save ticket on HDD and try to decrypt the ticket 
 > >
@@ -250,8 +250,6 @@
 > > > > > > ```powershell
 > > > > > > Invoke-ACLScanner -ResolveGUIDs | ?{$_.IdentityReferenceName -match <groupname>}
 > > > > > > ```
-> > > > > >
-> > > > > > 
 > > > > > >
 > > > > > > Check User SPN value 
 > > > > > >
